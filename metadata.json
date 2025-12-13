@@ -1,0 +1,5 @@
+{
+  "name": "WealthFlow AI Advisor",
+  "description": "A comprehensive personal finance management system that tracks assets, liabilities, and cash flow, utilizing Gemini AI to provide strategic financial advice for optimization.",
+  "requestFramePermissions": []
+}
