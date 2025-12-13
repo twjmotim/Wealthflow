@@ -25,7 +25,12 @@ Return a JSON object with the following structure:
 
 export const analyzeFinances = async (data: FinancialState): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = process.env.API_KEY;
+    if (!apiKey || apiKey.includes("undefined")) {
+        throw new Error("API Key 未設定。請在 Vercel 環境變數中設定 VITE_API_KEY。");
+    }
+
+    const ai = new GoogleGenAI({ apiKey: apiKey });
     
     const userPrompt = `
       Please analyze my current financial situation based on the following data:
@@ -58,15 +63,21 @@ export const analyzeFinances = async (data: FinancialState): Promise<string> => 
     });
 
     return response.text || "{}";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini API Error:", error);
-    throw new Error("Failed to generate financial advice. Please check your API_KEY.");
+    // Throw the specific error message to be displayed in the UI
+    throw new Error(error.message || "Failed to generate financial advice.");
   }
 };
 
 export const parseFinancialScreenshot = async (base64Image: string): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = process.env.API_KEY;
+    if (!apiKey || apiKey.includes("undefined")) {
+        throw new Error("API Key 未設定。請在 Vercel 環境變數中設定 VITE_API_KEY。");
+    }
+
+    const ai = new GoogleGenAI({ apiKey: apiKey });
 
     const prompt = `
       Analyze this image which is a screenshot of a financial account (Bank App, Securities App, or Credit Card Statement) from Taiwan.
@@ -108,15 +119,20 @@ export const parseFinancialScreenshot = async (base64Image: string): Promise<str
     });
 
     return response.text || '{"assets": [], "liabilities": []}';
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Vision Error:", error);
-    throw new Error("Failed to parse image.");
+    throw new Error(error.message || "Failed to parse image.");
   }
 };
 
 export const generateScenarioSummary = async (baseline: FinancialState, scenario: FinancialState): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = process.env.API_KEY;
+    if (!apiKey || apiKey.includes("undefined")) {
+        return "無法生成摘要 (API Key Missing)";
+    }
+
+    const ai = new GoogleGenAI({ apiKey: apiKey });
     
     // Calculate differences for prompt context
     const baselineAssets = baseline.assets.map(a => a.name);

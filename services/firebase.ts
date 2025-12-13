@@ -1,61 +1,59 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, onAuthStateChanged, User, Auth } from "firebase/auth";
-import { getFirestore, doc, setDoc, getDoc, Firestore } from "firebase/firestore";
+import firebase from "firebase/compat/app";
+import "firebase/compat/auth";
+import "firebase/compat/firestore";
 import { FinancialState, Scenario } from "../types";
 
-// Helper to safely get environment variables in various environments (Vite, Webpack, etc.)
-const getEnvVar = (key: string): string | undefined => {
-  // 1. Try Vite's import.meta.env (supports both VITE_ prefixed and plain if configured)
-  // @ts-ignore
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    // @ts-ignore
-    const viteKey = 'VITE_' + key;
-    // @ts-ignore
-    if (import.meta.env[viteKey]) return import.meta.env[viteKey];
-    // @ts-ignore
-    if (import.meta.env[key]) return import.meta.env[key];
-  }
+// Types for Firebase v8
+// We use the namespaces directly in the code, but for clarity:
+type User = firebase.User;
+type Auth = firebase.auth.Auth;
+type Firestore = firebase.firestore.Firestore;
 
-  // 2. Try standard process.env (Webpack, Next.js, or polyfilled env)
-  // @ts-ignore
-  if (typeof process !== 'undefined' && process.env) {
-    // @ts-ignore
-    if (process.env[key]) return process.env[key];
-     // @ts-ignore
-    if (process.env['REACT_APP_' + key]) return process.env['REACT_APP_' + key];
-  }
-  
-  return undefined;
-};
-
-let app: FirebaseApp | undefined;
+let app: firebase.app.App | undefined;
 let auth: Auth | undefined;
 let db: Firestore | undefined;
 
 // Initialize Firebase
 try {
-  const apiKey = getEnvVar('FIREBASE_API_KEY');
+  // Accessing process.env directly so Vite's define plugin can replace them
+  const apiKey = process.env.FIREBASE_API_KEY;
   
   if (apiKey) {
     const firebaseConfig = {
       apiKey: apiKey,
-      authDomain: getEnvVar('FIREBASE_AUTH_DOMAIN'),
-      projectId: getEnvVar('FIREBASE_PROJECT_ID'),
-      storageBucket: getEnvVar('FIREBASE_STORAGE_BUCKET'),
-      messagingSenderId: getEnvVar('FIREBASE_MESSAGING_SENDER_ID'),
-      appId: getEnvVar('FIREBASE_APP_ID')
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.FIREBASE_APP_ID
     };
 
-    if (getApps().length === 0) {
-      app = initializeApp(firebaseConfig);
-    } else {
-      app = getApp();
+    // Debug Log (Masking API Key)
+    console.log("Initializing Firebase with config:", {
+        ...firebaseConfig,
+        apiKey: "HIDDEN_IN_LOGS" 
+    });
+
+    // Explicit Validation
+    const missingKeys = [];
+    if (!firebaseConfig.authDomain) missingKeys.push("VITE_FIREBASE_AUTH_DOMAIN");
+    if (!firebaseConfig.projectId) missingKeys.push("VITE_FIREBASE_PROJECT_ID");
+    
+    if (missingKeys.length > 0) {
+        alert(`Firebase 設定錯誤：\n\n您的 Vercel 環境變數缺少以下關鍵設定：\n${missingKeys.join('\n')}\n\n請前往 Vercel Settings -> Environment Variables 修正。`);
     }
-    auth = getAuth(app);
-    db = getFirestore(app);
+
+    if (!firebase.apps.length) {
+      app = firebase.initializeApp(firebaseConfig);
+    } else {
+      app = firebase.app();
+    }
+    
+    auth = firebase.auth();
+    db = firebase.firestore();
     console.log("Firebase initialized successfully");
   } else {
-    console.warn("Firebase configuration missing. Check your .env file.");
+    console.warn("Firebase configuration missing. Env vars not found.");
   }
 } catch (error) {
   console.error("Firebase initialization failed:", error);
@@ -65,22 +63,28 @@ export const getFirebaseServices = () => ({ app, auth, db });
 
 export const loginWithGoogle = async () => {
   if (!auth) {
-    alert("系統尚未偵測到 Firebase 設定。\n\n請檢查您的 .env 檔案是否包含 'FIREBASE_API_KEY' 等變數。\n如果您使用的是 Vite，變數名稱可能需要加上 'VITE_' 前綴 (例如: VITE_FIREBASE_API_KEY)。");
+    alert("系統尚未偵測到 Firebase 設定，無法進行登入。\n請檢查 Console Log 確認變數是否正確載入。");
     return;
   }
-  const provider = new GoogleAuthProvider();
+  const provider = new firebase.auth.GoogleAuthProvider();
   try {
-    return await signInWithPopup(auth, provider);
+    return await auth.signInWithPopup(provider);
   } catch (error: any) {
     console.error("Login failed", error);
-    // Throw detailed error to be caught by UI
+    if (error.code === 'auth/unauthorized-domain') {
+      alert(`登入失敗：網域未授權 (Unauthorized Domain)。\n\n請前往 Firebase Console -> Authentication -> Settings -> Authorized Domains。\n將您的 Vercel 網域 (例如 wealthflow-one.vercel.app) 加入允許清單。`);
+    } else if (error.code === 'auth/auth-domain-config-required') {
+       alert("登入失敗：缺少 authDomain 設定。\n請檢查 Vercel 環境變數 VITE_FIREBASE_AUTH_DOMAIN 是否已設定。");
+    } else {
+      alert(`登入失敗 (${error.code}):\n${error.message}`);
+    }
     throw error;
   }
 };
 
 export const logout = async () => {
   if (!auth) return;
-  return firebaseSignOut(auth);
+  return auth.signOut();
 };
 
 export const subscribeAuth = (callback: (user: User | null) => void) => {
@@ -88,14 +92,14 @@ export const subscribeAuth = (callback: (user: User | null) => void) => {
     callback(null);
     return () => {};
   }
-  return onAuthStateChanged(auth, callback);
+  return auth.onAuthStateChanged(callback);
 };
 
 export const saveUserData = async (uid: string, data: { financials: FinancialState; scenarios: Scenario[] }) => {
   if (!db) return;
   try {
-    const userRef = doc(db, "users", uid);
-    await setDoc(userRef, data, { merge: true });
+    const userRef = db.collection("users").doc(uid);
+    await userRef.set(data, { merge: true });
   } catch (e) {
     console.error("Error saving data:", e);
     throw e;
@@ -105,9 +109,9 @@ export const saveUserData = async (uid: string, data: { financials: FinancialSta
 export const loadUserData = async (uid: string) => {
   if (!db) return null;
   try {
-    const userRef = doc(db, "users", uid);
-    const snapshot = await getDoc(userRef);
-    if (snapshot.exists()) {
+    const userRef = db.collection("users").doc(uid);
+    const snapshot = await userRef.get();
+    if (snapshot.exists) {
       return snapshot.data() as { financials: FinancialState; scenarios: Scenario[] };
     }
   } catch (e) {

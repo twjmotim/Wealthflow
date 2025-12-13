@@ -3,7 +3,7 @@ import { AssetType, LiabilityType, AssetItem, LiabilityItem, CashFlowItem, Finan
 import { analyzeFinances, parseFinancialScreenshot, generateScenarioSummary } from './services/geminiService';
 import { loginWithGoogle, logout, subscribeAuth, saveUserData, loadUserData } from './services/firebase';
 import { AssetAllocationChart, NetWorthBarChart } from './components/Charts';
-import { Plus, Trash2, DollarSign, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, BrainCircuit, Upload, ScanLine, X, Loader2, PlayCircle, Save, ArrowRight, LogIn, LogOut, User as UserIcon, Cloud, CloudOff, Pencil, Lock, Mail, UserCheck } from 'lucide-react';
+import { Plus, Trash2, DollarSign, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, BrainCircuit, Upload, ScanLine, X, Loader2, PlayCircle, Save, ArrowRight, LogIn, LogOut, User as UserIcon, Cloud, CloudOff, Pencil, Lock, Mail, UserCheck, ChevronRight } from 'lucide-react';
 import { User } from 'firebase/auth';
 
 // --- Initial Mock Data ---
@@ -233,7 +233,7 @@ export default function App() {
     } catch (e: any) {
         console.error("Login Error:", e);
         // Show alert so user knows why login failed (e.g., unauthorized domain, missing keys)
-        alert(`登入失敗 (Login Failed)：\n${e.message || e}\n\n如果您尚未設定 Firebase，請使用「訪客登入」`);
+        // Alert handled inside services/firebase.ts for specific errors, but catch-all here
         setLoginLoading(false);
     }
   };
@@ -286,8 +286,8 @@ export default function App() {
     try {
       const resultJson = await analyzeFinances(financials);
       setAiAnalysis(JSON.parse(resultJson));
-    } catch (e) {
-      alert("AI analysis failed. Please check your API Key.");
+    } catch (e: any) {
+      alert(`AI 分析失敗 (AI Analysis Failed):\n${e.message}`);
     } finally {
       setLoadingAi(false);
     }
@@ -319,9 +319,9 @@ export default function App() {
       if (parsed.liabilities) parsed.liabilities = parsed.liabilities.map((l: any) => ({ ...l, id: crypto.randomUUID() }));
       
       setExtractedData(parsed);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Failed to extract data. Please ensure the image is clear.");
+      alert(`圖像識別失敗 (Image Parse Failed):\n${e.message}`);
     } finally {
       setImporting(false);
     }
@@ -497,25 +497,56 @@ export default function App() {
 
   const renderDashboard = () => (
     <div className="space-y-6 animate-fade-in">
-      {/* KPI Cards */}
+      {/* KPI Cards - Clickable for navigation */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <div className="text-sm text-slate-500 mb-1">淨資產 Net Worth</div>
+        <div 
+          onClick={() => setActiveTab('advisor')} 
+          className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md hover:border-indigo-200 transition group relative"
+        >
+          <div className="text-sm text-slate-500 mb-1 flex items-center justify-between">
+            淨資產 Net Worth
+            <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition"/>
+          </div>
           <div className="text-2xl font-bold text-slate-800">${currentMetrics.netWorth.toLocaleString()}</div>
+          <span className="text-xs text-indigo-500 mt-2 block opacity-0 group-hover:opacity-100 transition absolute bottom-3">查看分析 &rarr;</span>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <div className="text-sm text-slate-500 mb-1">月現金流 Cash Flow</div>
+
+        <div 
+          onClick={() => setActiveTab('cashflow')}
+          className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md hover:border-indigo-200 transition group relative"
+        >
+          <div className="text-sm text-slate-500 mb-1 flex items-center justify-between">
+            月現金流 Cash Flow
+            <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition"/>
+          </div>
           <div className={`text-2xl font-bold ${currentMetrics.monthlyCashFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
             {currentMetrics.monthlyCashFlow >= 0 ? '+' : ''}${currentMetrics.monthlyCashFlow.toLocaleString()}
           </div>
+           <span className="text-xs text-indigo-500 mt-2 block opacity-0 group-hover:opacity-100 transition absolute bottom-3">編輯收支 &rarr;</span>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <div className="text-sm text-slate-500 mb-1">資產總額 Assets</div>
+
+        <div 
+          onClick={() => setActiveTab('assets')}
+          className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md hover:border-indigo-200 transition group relative"
+        >
+          <div className="text-sm text-slate-500 mb-1 flex items-center justify-between">
+            資產總額 Assets
+            <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition"/>
+          </div>
           <div className="text-2xl font-bold text-emerald-600">${currentMetrics.totalAssets.toLocaleString()}</div>
+          <span className="text-xs text-indigo-500 mt-2 block opacity-0 group-hover:opacity-100 transition absolute bottom-3">管理資產 &rarr;</span>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <div className="text-sm text-slate-500 mb-1">負債總額 Liabilities</div>
+
+        <div 
+          onClick={() => setActiveTab('liabilities')}
+          className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md hover:border-indigo-200 transition group relative"
+        >
+          <div className="text-sm text-slate-500 mb-1 flex items-center justify-between">
+            負債總額 Liabilities
+            <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition"/>
+          </div>
           <div className="text-2xl font-bold text-rose-600">${currentMetrics.totalLiabilities.toLocaleString()}</div>
+          <span className="text-xs text-indigo-500 mt-2 block opacity-0 group-hover:opacity-100 transition absolute bottom-3">管理負債 &rarr;</span>
         </div>
       </div>
 
@@ -557,52 +588,96 @@ export default function App() {
           <Plus size={16} /> 新增資產
         </button>
       </div>
-      <table className="w-full text-left border-collapse">
-        <thead className="bg-slate-50 text-slate-600 text-sm">
-          <tr>
-            <th className="p-4 font-semibold">名稱</th>
-            <th className="p-4 font-semibold">類型</th>
-            <th className="p-4 font-semibold">流動性</th>
-            <th className="p-4 font-semibold">預期報酬率</th>
-            <th className="p-4 font-semibold text-right">價值</th>
-            <th className="p-4 font-semibold w-24 text-center">操作</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {financials.assets.map(asset => (
-            <tr key={asset.id} className="hover:bg-slate-50">
-              <td className="p-4 font-medium text-slate-900">{asset.name}</td>
-              <td className="p-4 text-slate-600 text-sm">{asset.type}</td>
-              <td className="p-4 text-sm">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  asset.liquidity === 'High' ? 'bg-blue-100 text-blue-700' :
-                  asset.liquidity === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-200 text-slate-700'
-                }`}>
-                  {asset.liquidity}
-                </span>
-              </td>
-              <td className="p-4 text-slate-600 text-sm">{asset.returnRate}%</td>
-              <td className="p-4 text-right font-medium text-emerald-600">${asset.value.toLocaleString()}</td>
-              <td className="p-4 flex justify-center gap-2">
-                <button 
-                  onClick={() => handleOpenModal('asset', asset)}
-                  className="text-slate-400 hover:text-indigo-500 transition"
-                  title="編輯"
-                >
-                  <Pencil size={18} />
-                </button>
-                <button 
-                  onClick={() => handleDelete('assets', asset.id)}
-                  className="text-slate-400 hover:text-rose-500 transition"
-                  title="刪除"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </td>
+      
+      {/* Desktop Table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-slate-50 text-slate-600 text-sm">
+            <tr>
+              <th className="p-4 font-semibold">名稱</th>
+              <th className="p-4 font-semibold">類型</th>
+              <th className="p-4 font-semibold">流動性</th>
+              <th className="p-4 font-semibold">預期報酬率</th>
+              <th className="p-4 font-semibold text-right">價值</th>
+              <th className="p-4 font-semibold w-24 text-center">操作</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {financials.assets.map(asset => (
+              <tr key={asset.id} className="hover:bg-slate-50 transition">
+                <td className="p-4 font-medium text-slate-900">{asset.name}</td>
+                <td className="p-4 text-slate-600 text-sm">{asset.type}</td>
+                <td className="p-4 text-sm">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    asset.liquidity === 'High' ? 'bg-blue-100 text-blue-700' :
+                    asset.liquidity === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {asset.liquidity}
+                  </span>
+                </td>
+                <td className="p-4 text-slate-600 text-sm">{asset.returnRate}%</td>
+                <td className="p-4 text-right font-medium text-emerald-600">${asset.value.toLocaleString()}</td>
+                <td className="p-4 flex justify-center gap-2">
+                  <button 
+                    onClick={() => handleOpenModal('asset', asset)}
+                    className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition"
+                    title="編輯"
+                  >
+                    <Pencil size={18} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete('assets', asset.id)}
+                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                    title="刪除"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Card View (Responsive) */}
+      <div className="md:hidden">
+         {financials.assets.map(asset => (
+           <div key={asset.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition">
+              <div className="flex justify-between items-start mb-2">
+                 <div>
+                    <h3 className="font-bold text-slate-800">{asset.name}</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">{asset.type}</p>
+                 </div>
+                 <span className="font-bold text-emerald-600">${asset.value.toLocaleString()}</span>
+              </div>
+              
+              <div className="flex items-center gap-3 text-xs text-slate-500 mb-3">
+                 <span className={`px-2 py-0.5 rounded-full ${
+                    asset.liquidity === 'High' ? 'bg-blue-100 text-blue-700' :
+                    asset.liquidity === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {asset.liquidity} 流動性
+                 </span>
+                 <span>報酬率 {asset.returnRate}%</span>
+              </div>
+
+              <div className="flex gap-2 mt-2">
+                 <button 
+                    onClick={() => handleOpenModal('asset', asset)}
+                    className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition flex items-center justify-center gap-2"
+                 >
+                    <Pencil size={14} /> 編輯
+                 </button>
+                 <button 
+                    onClick={() => handleDelete('assets', asset.id)}
+                    className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition flex items-center justify-center gap-2"
+                 >
+                    <Trash2 size={14} /> 刪除
+                 </button>
+              </div>
+           </div>
+         ))}
+      </div>
     </div>
   );
 
@@ -617,45 +692,84 @@ export default function App() {
           <Plus size={16} /> 新增負債
         </button>
       </div>
-      <table className="w-full text-left border-collapse">
-        <thead className="bg-slate-50 text-slate-600 text-sm">
-          <tr>
-            <th className="p-4 font-semibold">名稱</th>
-            <th className="p-4 font-semibold">類型</th>
-            <th className="p-4 font-semibold">年利率</th>
-            <th className="p-4 font-semibold text-right">月繳金額</th>
-            <th className="p-4 font-semibold text-right">剩餘餘額</th>
-            <th className="p-4 font-semibold w-24 text-center">操作</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {financials.liabilities.map(item => (
-            <tr key={item.id} className="hover:bg-slate-50">
-              <td className="p-4 font-medium text-slate-900">{item.name}</td>
-              <td className="p-4 text-slate-600 text-sm">{item.type}</td>
-              <td className="p-4 text-slate-600 text-sm">{item.interestRate}%</td>
-              <td className="p-4 text-right text-slate-600">${item.monthlyPayment.toLocaleString()}</td>
-              <td className="p-4 text-right font-medium text-rose-600">${item.amount.toLocaleString()}</td>
-              <td className="p-4 flex justify-center gap-2">
-                <button 
-                  onClick={() => handleOpenModal('liability', item)}
-                  className="text-slate-400 hover:text-indigo-500 transition"
-                  title="編輯"
-                >
-                  <Pencil size={18} />
-                </button>
-                <button 
-                  onClick={() => handleDelete('liabilities', item.id)}
-                  className="text-slate-400 hover:text-rose-500 transition"
-                  title="刪除"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </td>
+
+      {/* Desktop Table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-slate-50 text-slate-600 text-sm">
+            <tr>
+              <th className="p-4 font-semibold">名稱</th>
+              <th className="p-4 font-semibold">類型</th>
+              <th className="p-4 font-semibold">年利率</th>
+              <th className="p-4 font-semibold text-right">月繳金額</th>
+              <th className="p-4 font-semibold text-right">剩餘餘額</th>
+              <th className="p-4 font-semibold w-24 text-center">操作</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {financials.liabilities.map(item => (
+              <tr key={item.id} className="hover:bg-slate-50 transition">
+                <td className="p-4 font-medium text-slate-900">{item.name}</td>
+                <td className="p-4 text-slate-600 text-sm">{item.type}</td>
+                <td className="p-4 text-slate-600 text-sm">{item.interestRate}%</td>
+                <td className="p-4 text-right text-slate-600">${item.monthlyPayment.toLocaleString()}</td>
+                <td className="p-4 text-right font-medium text-rose-600">${item.amount.toLocaleString()}</td>
+                <td className="p-4 flex justify-center gap-2">
+                  <button 
+                    onClick={() => handleOpenModal('liability', item)}
+                    className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition"
+                    title="編輯"
+                  >
+                    <Pencil size={18} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete('liabilities', item.id)}
+                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                    title="刪除"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Card View (Responsive) */}
+      <div className="md:hidden">
+         {financials.liabilities.map(item => (
+           <div key={item.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition">
+              <div className="flex justify-between items-start mb-2">
+                 <div>
+                    <h3 className="font-bold text-slate-800">{item.name}</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">{item.type}</p>
+                 </div>
+                 <span className="font-bold text-rose-600">${item.amount.toLocaleString()}</span>
+              </div>
+              
+              <div className="flex justify-between items-center text-xs text-slate-500 mb-3 bg-slate-50 p-2 rounded">
+                 <span>利率: {item.interestRate}%</span>
+                 <span>月繳: ${item.monthlyPayment.toLocaleString()}</span>
+              </div>
+
+              <div className="flex gap-2 mt-2">
+                 <button 
+                    onClick={() => handleOpenModal('liability', item)}
+                    className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition flex items-center justify-center gap-2"
+                 >
+                    <Pencil size={14} /> 編輯
+                 </button>
+                 <button 
+                    onClick={() => handleDelete('liabilities', item.id)}
+                    className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition flex items-center justify-center gap-2"
+                 >
+                    <Trash2 size={14} /> 刪除
+                 </button>
+              </div>
+           </div>
+         ))}
+      </div>
     </div>
   );
 
@@ -671,13 +785,14 @@ export default function App() {
         </div>
         <div className="p-4 space-y-3">
           {financials.incomes.map(item => (
-            <div key={item.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg group">
+            <div key={item.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg group hover:shadow-sm transition">
               <span className="text-slate-700 font-medium">{item.name}</span>
               <div className="flex items-center gap-3">
                 <span className="text-emerald-600 font-semibold">+${item.amount.toLocaleString()}</span>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                    <button onClick={() => handleOpenModal('income', item)} className="text-slate-300 hover:text-indigo-500"><Pencil size={16}/></button>
-                    <button onClick={() => handleDelete('incomes', item.id)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
+                {/* Always visible on mobile, hover on desktop */}
+                <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition opacity-100">
+                    <button onClick={() => handleOpenModal('income', item)} className="p-1 text-slate-300 hover:text-indigo-500"><Pencil size={16}/></button>
+                    <button onClick={() => handleDelete('incomes', item.id)} className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
                 </div>
               </div>
             </div>
@@ -701,13 +816,14 @@ export default function App() {
         </div>
         <div className="p-4 space-y-3">
           {financials.expenses.map(item => (
-            <div key={item.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg group">
+            <div key={item.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg group hover:shadow-sm transition">
               <span className="text-slate-700 font-medium">{item.name}</span>
               <div className="flex items-center gap-3">
                 <span className="text-rose-600 font-semibold">-${item.amount.toLocaleString()}</span>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                    <button onClick={() => handleOpenModal('expense', item)} className="text-slate-300 hover:text-indigo-500"><Pencil size={16}/></button>
-                    <button onClick={() => handleDelete('expenses', item.id)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
+                {/* Always visible on mobile, hover on desktop */}
+                <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition opacity-100">
+                    <button onClick={() => handleOpenModal('expense', item)} className="p-1 text-slate-300 hover:text-indigo-500"><Pencil size={16}/></button>
+                    <button onClick={() => handleDelete('expenses', item.id)} className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
                 </div>
               </div>
             </div>
