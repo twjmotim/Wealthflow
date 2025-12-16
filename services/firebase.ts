@@ -28,19 +28,14 @@ try {
       appId: process.env.FIREBASE_APP_ID
     };
 
-    // Debug Log (Masking API Key)
-    console.log("Initializing Firebase with config:", {
-        ...firebaseConfig,
-        apiKey: "HIDDEN_IN_LOGS" 
-    });
-
-    // Explicit Validation
+    // Explicit Validation for easier debugging
     const missingKeys = [];
     if (!firebaseConfig.authDomain) missingKeys.push("VITE_FIREBASE_AUTH_DOMAIN");
     if (!firebaseConfig.projectId) missingKeys.push("VITE_FIREBASE_PROJECT_ID");
     
     if (missingKeys.length > 0) {
-        alert(`Firebase 設定錯誤：\n\n您的 Vercel 環境變數缺少以下關鍵設定：\n${missingKeys.join('\n')}\n\n請前往 Vercel Settings -> Environment Variables 修正。`);
+        console.error("Missing Env Vars:", missingKeys);
+        alert(`Firebase 設定錯誤：\n\n您的 Vercel 環境變數缺少以下關鍵設定，導致無法登入：\n${missingKeys.join('\n')}\n\n請前往 Vercel Settings -> Environment Variables 修正。`);
     }
 
     if (!firebase.apps.length) {
@@ -63,7 +58,7 @@ export const getFirebaseServices = () => ({ app, auth, db });
 
 export const loginWithGoogle = async () => {
   if (!auth) {
-    alert("系統尚未偵測到 Firebase 設定，無法進行登入。\n請檢查 Console Log 確認變數是否正確載入。");
+    alert("系統尚未偵測到 Firebase 設定，無法進行登入。\n請檢查 Vercel 環境變數是否已正確設定並重新佈署。");
     return;
   }
   const provider = new firebase.auth.GoogleAuthProvider();
@@ -74,7 +69,7 @@ export const loginWithGoogle = async () => {
     if (error.code === 'auth/unauthorized-domain') {
       alert(`登入失敗：網域未授權 (Unauthorized Domain)。\n\n請前往 Firebase Console -> Authentication -> Settings -> Authorized Domains。\n將您的 Vercel 網域 (例如 wealthflow-one.vercel.app) 加入允許清單。`);
     } else if (error.code === 'auth/auth-domain-config-required') {
-       alert("登入失敗：缺少 authDomain 設定。\n請檢查 Vercel 環境變數 VITE_FIREBASE_AUTH_DOMAIN 是否已設定。");
+       alert("登入失敗：缺少 authDomain 設定。\n請檢查 Vercel 環境變數 VITE_FIREBASE_AUTH_DOMAIN 是否已設定並正確拼寫。");
     } else {
       alert(`登入失敗 (${error.code}):\n${error.message}`);
     }
