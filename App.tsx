@@ -326,24 +326,52 @@ export default function App() {
   const toggleScenarioItem = (category: keyof FinancialState, item: any) => {
     if (!editingScenario) return;
     
-    const currentList = editingScenario.data[category] as any[];
+    let newData = { ...editingScenario.data };
+    const currentList = newData[category] as any[];
     const exists = currentList.find(x => x.id === item.id);
     
-    let newList;
+    // Helper to normalize names for comparison (remove spaces, symbols)
+    const normalize = (s: string) => s.replace(/[\s\-_支出費用]/g, '').toLowerCase();
+
     if (exists) {
-      // Uncheck -> Means "Sold" (Asset) or "Paid Off" (Liability) or "Cut" (Expense)
-      newList = currentList.filter(x => x.id !== item.id);
+      // Uncheck -> Remove (Simulate Sell/Payoff/Cut)
+      newData[category] = currentList.filter(x => x.id !== item.id);
+
+      // --- SMART LINKING LOGIC (Auto-remove associated items) ---
+      if (category === 'liabilities') {
+        // If we pay off a liability, we should also cut the corresponding expense
+        const liabilityName = normalize(item.name);
+        newData.expenses = newData.expenses.filter(exp => {
+           const expName = normalize(exp.name);
+           // If names are very similar, assume they are linked and remove the expense too
+           const isLinked = expName.includes(liabilityName) || liabilityName.includes(expName);
+           return !isLinked; // Keep only if NOT linked
+        });
+      }
     } else {
-      // Check -> Add it back
-      newList = [...currentList, item];
+      // Check -> Add back
+      // Since arrays in editingScenario.data might be different refs, we assume item is from originalData
+      newData[category] = [...currentList, item];
+      
+      // --- SMART LINKING LOGIC (Auto-restore associated items) ---
+       if (category === 'liabilities') {
+          // If we restore a liability, check if we need to restore a linked expense
+          const liabilityName = normalize(item.name);
+          const originalExpense = editingScenario.originalData.expenses.find(exp => {
+              const expName = normalize(exp.name);
+              return expName.includes(liabilityName) || liabilityName.includes(expName);
+          });
+          
+          // If we found a linked expense AND it's currently missing (cut), add it back
+          if (originalExpense && !newData.expenses.find(e => e.id === originalExpense.id)) {
+             newData.expenses = [...newData.expenses, originalExpense];
+          }
+       }
     }
     
     setEditingScenario({
       ...editingScenario,
-      data: {
-        ...editingScenario.data,
-        [category]: newList
-      }
+      data: newData
     });
   };
 
@@ -504,25 +532,47 @@ export default function App() {
     // 1. Calculate Differences (What was Sold/Paid)
     // Assets present in Original but NOT in Scenario -> Sold
     const soldAssets = editingScenario ? editingScenario.originalData.assets.filter(orig => !editingScenario.data.assets.find(curr => curr.id === orig.id)) : [];
+    
     // Liabilities present in Original but NOT in Scenario -> Paid Off
     const paidLiabilities = editingScenario ? editingScenario.originalData.liabilities.filter(orig => !editingScenario.data.liabilities.find(curr => curr.id === orig.id)) : [];
 
-    // 2. Calculate Transaction Totals
+    // Expenses cut (Expenses in Original but not Scenario)
+    const cutExpenses = editingScenario ? editingScenario.originalData.expenses.filter(orig => !editingScenario.data.expenses.find(curr => curr.id === orig.id)) : [];
+
+    // 2. Calculate Transaction Totals (Liquidity)
     const cashGenerated = soldAssets.reduce((sum, a) => sum + a.value, 0);
     const cashRequired = paidLiabilities.reduce((sum, l) => sum + l.amount, 0);
     const remainingCash = cashGenerated - cashRequired;
 
-    // 3. Calculate Cash Flow Impact
-    // Saved monthly payments from paid liabilities
-    const monthlyPaymentSaved = paidLiabilities.reduce((sum, l) => sum + l.monthlyPayment, 0);
+    // 3. Calculate Cash Flow Impact (DEDUPLICATED)
+    
+    // Total saved from directly cutting expenses
+    const expensesSaved = cutExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    // Calculate Liability Savings (Only add if NOT covered by a cut expense to avoid double counting)
+    let liabilityMonthlySaved = 0;
+    const normalize = (s: string) => s.replace(/[\s\-_支出費用]/g, '').toLowerCase();
+
+    paidLiabilities.forEach(l => {
+        const lName = normalize(l.name);
+        // Check if this liability has a matching expense that is ALSO cut
+        const hasMatchingCutExpense = cutExpenses.some(e => {
+            const eName = normalize(e.name);
+            return eName.includes(lName) || lName.includes(eName);
+        });
+
+        // Only count the Liability's monthlyPayment if we haven't already counted it via an Expense
+        if (!hasMatchingCutExpense) {
+            liabilityMonthlySaved += l.monthlyPayment;
+        }
+    });
+
+    const monthlyPaymentSavedTotal = expensesSaved + liabilityMonthlySaved;
+
     // Lost monthly income from sold assets (Estimate based on return rate)
     const monthlyIncomeLost = soldAssets.reduce((sum, a) => sum + (a.value * (a.returnRate || 0) / 100 / 12), 0);
     
-    // Expenses cut (Expenses in Original but not Scenario)
-    const cutExpenses = editingScenario ? editingScenario.originalData.expenses.filter(orig => !editingScenario.data.expenses.find(curr => curr.id === orig.id)) : [];
-    const expensesSaved = cutExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-    const netCashFlowChange = monthlyPaymentSaved + expensesSaved - monthlyIncomeLost;
+    const netCashFlowChange = monthlyPaymentSavedTotal - monthlyIncomeLost;
     const projectedMonthlyCashFlow = currentMetrics.monthlyCashFlow + netCashFlowChange;
 
     const renderInteractiveList = (title: string, items: any[], category: keyof FinancialState, icon: React.ElementType, isNegative: boolean) => (
@@ -656,16 +706,12 @@ export default function App() {
                     <h3 className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-4">每月現金流變化 Impact</h3>
                     <div className="space-y-3 relative z-10">
                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-slate-600">減少月付金 (Saved)</span>
-                          <span className="font-bold text-emerald-600">+{monthlyPaymentSaved.toLocaleString()}</span>
+                          <span className="text-slate-600">減少月付金 / 支出 (Saved)</span>
+                          <span className="font-bold text-emerald-600">+{monthlyPaymentSavedTotal.toLocaleString()}</span>
                        </div>
                        <div className="flex justify-between items-center text-sm">
                           <span className="text-slate-600">損失資產收益 (Lost Income)</span>
                           <span className="font-bold text-rose-600">-{Math.round(monthlyIncomeLost).toLocaleString()}</span>
-                       </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-slate-600">削減支出 (Cut Expenses)</span>
-                          <span className="font-bold text-emerald-600">+{expensesSaved.toLocaleString()}</span>
                        </div>
                        <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
                           <span className="font-bold text-slate-800">每月淨改善</span>
