@@ -483,6 +483,83 @@ export default function App() {
       </div>
     </div>
   );
+  
+  // Dedicated Advisor Renderer
+  const renderAdvisor = () => (
+    <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-fade-in">
+      {/* Intro Card */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
+        <div className="relative z-10">
+          <h2 className="text-3xl font-bold mb-4 flex items-center gap-3">
+             <BrainCircuit size={32} /> AI 智能財務顧問
+          </h2>
+          <p className="text-indigo-100 mb-8 max-w-xl text-lg leading-relaxed">
+            基於您的資產負債表與現金流，Gemini AI 將為您進行全方位的財務健檢，並提供具體的償債與投資建議。
+          </p>
+          <button 
+            onClick={handleRunAnalysis} 
+            disabled={loadingAi}
+            className="bg-white text-indigo-600 font-bold py-3 px-8 rounded-full shadow-lg hover:bg-indigo-50 transition transform hover:scale-105 active:scale-95 flex items-center gap-2"
+          >
+            {loadingAi ? <Loader2 className="animate-spin" /> : <BrainCircuit size={20} />}
+            {loadingAi ? 'AI 正在分析您的財務狀況...' : '開始 AI 財務健檢'}
+          </button>
+        </div>
+        {/* Background Decorations */}
+        <div className="absolute right-0 top-0 h-full w-1/2 opacity-10 pointer-events-none">
+            <Activity size={400} className="absolute -right-20 -top-20" />
+        </div>
+      </div>
+
+      {/* Analysis Result */}
+      {aiAnalysis && (
+        <div className="space-y-6 animate-fade-in-up">
+           {/* Summary & Score */}
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 md:col-span-2">
+                 <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">總結 Summary</h3>
+                 <p className="text-slate-700 leading-relaxed text-lg">{aiAnalysis.summary}</p>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden">
+                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-transparent opacity-50"></div>
+                 <span className="text-sm font-bold text-slate-500 uppercase z-10">財務健康分</span>
+                 <span className={`text-6xl font-black z-10 my-2 ${aiAnalysis.healthScore >= 70 ? 'text-emerald-600' : aiAnalysis.healthScore >= 50 ? 'text-amber-500' : 'text-rose-600'}`}>
+                    {aiAnalysis.healthScore}
+                 </span>
+                 <span className="text-xs text-slate-400 font-medium z-10">/ 100</span>
+              </div>
+           </div>
+
+           {/* Immediate Actions */}
+           <div className="bg-white p-6 rounded-xl shadow-sm border border-rose-100 bg-rose-50/30">
+              <h3 className="text-lg font-bold text-rose-700 mb-4 flex items-center gap-2">
+                 <AlertTriangle size={20}/> 優先執行行動 Immediate Actions
+              </h3>
+              <ul className="space-y-3">
+                 {aiAnalysis.immediateActions?.map((action: string, idx: number) => (
+                    <li key={idx} className="flex items-start gap-3 bg-white p-3 rounded-lg border border-rose-100 shadow-sm">
+                       <div className="mt-0.5 min-w-[20px] h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-xs font-bold">{idx + 1}</div>
+                       <span className="text-slate-700 font-medium">{action}</span>
+                    </li>
+                 ))}
+              </ul>
+           </div>
+
+           {/* Strategic Advice */}
+           <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100">
+              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                 <CheckCircle size={20} className="text-emerald-500"/> 投資與償債策略 Strategic Advice
+              </h3>
+              <div className="prose prose-slate max-w-none text-slate-600">
+                 {aiAnalysis.strategicAdvice.split('\n').map((line: string, i: number) => (
+                    <p key={i} className="mb-2">{line}</p>
+                 ))}
+              </div>
+           </div>
+        </div>
+      )}
+    </div>
+  );
 
   // Reusable List Renderer
   const renderList = (title: string, items: any[], type: 'asset' | 'liability' | 'income' | 'expense', color: string) => {
@@ -948,7 +1025,7 @@ export default function App() {
                    </div>
                 )}
                 {activeTab === 'import' && renderDashboard()} {/* Placeholder, reusing import logic in full file */}
-                {activeTab === 'advisor' && renderDashboard()} {/* Placeholder */}
+                {activeTab === 'advisor' && renderAdvisor()}
             </div>
           )}
         </div>
