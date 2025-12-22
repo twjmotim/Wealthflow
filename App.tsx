@@ -124,6 +124,33 @@ export default function App() {
 
   const currentMetrics = calcMetrics(financials);
 
+  const normalize = (s: string) => s.replace(/[\s\-_支出費用貸款房貸信貸車貸]/g, '').toLowerCase();
+
+  const toggleScenarioItem = (category: keyof FinancialState, item: any) => {
+    if (!editingScenario) return;
+    let newData = { ...editingScenario.data };
+    const currentList = newData[category] as any[];
+    const exists = currentList.find(x => x.id === item.id);
+    
+    if (exists) {
+      newData[category] = currentList.filter(x => x.id !== item.id);
+      if (category === 'liabilities') {
+        const liabilityName = normalize(item.name);
+        newData.expenses = newData.expenses.filter(exp => !normalize(exp.name).includes(liabilityName) && !liabilityName.includes(normalize(exp.name)));
+      }
+    } else {
+      newData[category] = [...currentList, item];
+      if (category === 'liabilities') {
+        const liabilityName = normalize(item.name);
+        const originalExpense = editingScenario.originalData.expenses.find(exp => normalize(exp.name).includes(liabilityName) || liabilityName.includes(normalize(exp.name)));
+        if (originalExpense && !newData.expenses.find(e => e.id === originalExpense.id)) {
+          newData.expenses = [...newData.expenses, originalExpense];
+        }
+      }
+    }
+    setEditingScenario({ ...editingScenario, data: newData });
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -339,8 +366,48 @@ export default function App() {
   const renderScenarioMode = () => {
     const soldAssets = editingScenario ? editingScenario.originalData.assets.filter(orig => !editingScenario.data.assets.find(curr => curr.id === orig.id)) : [];
     const paidLiabilities = editingScenario ? editingScenario.originalData.liabilities.filter(orig => !editingScenario.data.liabilities.find(curr => curr.id === orig.id)) : [];
+    
+    const cashGenerated = soldAssets.reduce((sum, a) => sum + a.value, 0);
+    const cashRequired = paidLiabilities.reduce((sum, l) => sum + l.amount, 0);
+    const remainingCash = cashGenerated - cashRequired;
+
     const metrics = calcMetrics(editingScenario?.data || financials);
     const netCashFlowChange = metrics.monthlyCashFlow - currentMetrics.monthlyCashFlow;
+
+    const renderInteractiveList = (title: string, items: any[], category: keyof FinancialState, icon: React.ElementType, isNegative: boolean) => (
+      <div className="bg-white border border-slate-100 rounded-[30px] overflow-hidden flex flex-col h-full shadow-sm">
+        <div className={`px-6 py-5 border-b border-slate-50 flex items-center justify-between ${isNegative ? 'bg-rose-50/50' : 'bg-emerald-50/50'}`}>
+           <div className="flex items-center gap-3">
+             {React.createElement(icon, { size: 18, className: isNegative ? "text-rose-600" : "text-emerald-600" })}
+             <span className={`font-black tracking-tight text-sm ${isNegative ? "text-rose-900" : "text-emerald-900"}`}>{title}</span>
+           </div>
+        </div>
+        <div className="p-3 space-y-2 flex-1 overflow-y-auto">
+          {editingScenario?.originalData[category].map((item: any) => {
+             const isKept = (editingScenario.data[category] as any[]).find(x => x.id === item.id);
+             return (
+               <div 
+                 key={item.id} 
+                 onClick={() => toggleScenarioItem(category, item)}
+                 className={`group flex items-center gap-3 p-4 rounded-2xl cursor-pointer border transition-all duration-300 ${
+                   isKept 
+                     ? 'bg-white border-slate-100 hover:border-indigo-300 shadow-sm' 
+                     : 'bg-slate-50 border-transparent opacity-30 grayscale scale-[0.98]'
+                 }`}
+               >
+                 <div className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${isKept ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'}`}>
+                    {isKept && <CheckCircle size={12} className="text-white" />}
+                 </div>
+                 <div className="flex-1 min-w-0">
+                   <div className={`text-xs font-black truncate ${isKept ? 'text-slate-800' : 'text-slate-400 line-through'}`}>{item.name}</div>
+                   <div className="text-[10px] font-bold text-slate-500">${(item.value || item.amount).toLocaleString()}</div>
+                 </div>
+               </div>
+             )
+          })}
+        </div>
+      </div>
+    );
 
     return (
       <div className="flex flex-col h-full bg-slate-50 -m-6 md:-m-10 p-6 md:p-10 overflow-y-auto min-h-screen">
@@ -413,11 +480,11 @@ export default function App() {
                  <div className="bg-white rounded-[35px] p-8 shadow-sm border border-slate-100 flex flex-col justify-between">
                     <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-6">流動資金分析 (Liquidity)</h3>
                     <div className="space-y-4">
-                       <div className="flex justify-between items-center"><span className="text-slate-600 font-bold">資產變現解鎖</span><span className="font-black text-emerald-500 text-lg">+$...</span></div>
-                       <div className="flex justify-between items-center"><span className="text-slate-600 font-bold">預計負債清償</span><span className="font-black text-rose-500 text-lg">-$...</span></div>
+                       <div className="flex justify-between items-center"><span className="text-slate-600 font-bold">資產變現解鎖</span><span className="font-black text-emerald-500 text-lg">+{cashGenerated.toLocaleString()}</span></div>
+                       <div className="flex justify-between items-center"><span className="text-slate-600 font-bold">預計負債清償</span><span className="font-black text-rose-500 text-lg">-{cashRequired.toLocaleString()}</span></div>
                        <div className="pt-6 border-t border-slate-50 flex justify-between items-center">
                           <span className="font-black text-slate-950 text-lg">模擬可用餘額</span>
-                          <span className="text-2xl font-black text-indigo-600">$...</span>
+                          <span className={`text-2xl font-black ${remainingCash >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>${remainingCash.toLocaleString()}</span>
                        </div>
                     </div>
                  </div>
@@ -441,6 +508,13 @@ export default function App() {
                        {metrics.monthlyCashFlow >= 0 ? 'Monthly Surplus' : 'Deficit Warning'}
                     </div>
                  </div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 min-h-[400px]">
+                  {renderInteractiveList('資產變現 (Assets)', editingScenario.originalData.assets, 'assets', DollarSign, false)}
+                  {renderInteractiveList('償還負債 (Liabilities)', editingScenario.originalData.liabilities, 'liabilities', TrendingDown, true)}
+                  {renderInteractiveList('削減支出 (Expenses)', editingScenario.originalData.expenses, 'expenses', TrendingDown, true)}
+                  {renderInteractiveList('收入來源 (Incomes)', editingScenario.originalData.incomes, 'incomes', TrendingUp, false)}
               </div>
               <p className="text-center text-slate-400 font-bold text-sm">請點擊資產/負債項目的勾選框來進行情境加減</p>
            </div>
