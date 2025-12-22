@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { AssetType, LiabilityType, AssetItem, LiabilityItem, CashFlowItem, FinancialState, Scenario, ChatMessage, SavedAdvice } from './types';
 import { analyzeFinances, parseFinancialScreenshot, generateScenarioSummary } from './services/geminiService';
@@ -54,6 +53,7 @@ export default function App() {
   const [chatInput, setChatInput] = useState('');
   const [isChatting, setIsChatting] = useState(false);
   const [savedAdvices, setSavedAdvices] = useState<SavedAdvice[]>([]);
+  const [selectedAdvice, setSelectedAdvice] = useState<SavedAdvice | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
@@ -169,7 +169,6 @@ export default function App() {
     }
   };
 
-  // Fix: Added handleOpenModal to manage adding/editing items in the financial state
   const handleOpenModal = (type: string, item?: any) => {
     setEditingId(item?.id || null);
     if (item) {
@@ -203,7 +202,6 @@ export default function App() {
     setIsModalOpen(true);
   };
 
-  // Fix: Added handleSaveItem to persist changes from the modal to the state
   const handleSaveItem = () => {
     if (!modalConfig) return;
     const { type } = modalConfig;
@@ -508,13 +506,19 @@ export default function App() {
              <h3 className="text-xl font-black text-slate-950 flex items-center gap-3"><History size={24}/> 歷史診斷紀錄 (Saved Reports)</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {savedAdvices.map(advice => (
-                  <div key={advice.id} className="bg-white p-8 rounded-[35px] border border-slate-100 shadow-sm">
+                  <div key={advice.id} className="bg-white p-8 rounded-[35px] border border-slate-100 shadow-sm group hover:border-indigo-200 transition-all">
                      <div className="flex justify-between mb-4">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{new Date(advice.createdAt).toLocaleDateString()}</span>
                         <div className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black">Score: {advice.score}</div>
                      </div>
                      <h4 className="font-black text-slate-800 mb-2 truncate">{advice.title}</h4>
-                     <p className="text-slate-500 text-xs font-bold line-clamp-2 leading-relaxed">{advice.content}</p>
+                     <p className="text-slate-500 text-xs font-bold line-clamp-2 leading-relaxed mb-6">{advice.content}</p>
+                     <button 
+                       onClick={() => setSelectedAdvice(advice)}
+                       className="text-indigo-600 font-black text-xs flex items-center gap-2 hover:gap-3 transition-all"
+                     >
+                       詳情內容 View Detail <ChevronRight size={14}/>
+                     </button>
                   </div>
                 ))}
                 {savedAdvices.length === 0 && (
@@ -556,8 +560,48 @@ export default function App() {
              </form>
           </div>
         </div>
+        {renderAdviceDetailModal()}
     </div>
   );
+
+  const renderAdviceDetailModal = () => {
+    if (!selectedAdvice) return null;
+    return (
+      <div className="fixed inset-0 bg-slate-950/80 z-[70] flex items-center justify-center p-4 backdrop-blur-xl animate-fade-in">
+        <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="p-8 border-b border-slate-50 flex justify-between items-center">
+            <div>
+              <h3 className="font-black text-xl md:text-2xl text-slate-950">報告詳情 Report Detail</h3>
+              <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Saved Financial Diagnosis</p>
+            </div>
+            <button onClick={() => setSelectedAdvice(null)} className="p-3 hover:bg-slate-100 rounded-full transition"><X size={24}/></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-8">
+             <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-400 bg-slate-50 px-4 py-2 rounded-full border border-slate-100">存檔日期: {new Date(selectedAdvice.createdAt).toLocaleString()}</span>
+                <div className={`px-5 py-2 rounded-2xl font-black text-sm flex items-center gap-2 ${selectedAdvice.score >= 70 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                   健康得分: {selectedAdvice.score}
+                </div>
+             </div>
+             <div>
+                <h4 className="font-black text-slate-800 text-lg mb-4">{selectedAdvice.title}</h4>
+                <div className="p-8 bg-slate-50 border border-slate-100 rounded-[35px] text-slate-600 font-bold leading-relaxed whitespace-pre-wrap text-md">
+                   {selectedAdvice.content}
+                </div>
+             </div>
+          </div>
+          <div className="p-8 bg-slate-50 border-t border-slate-100">
+             <button 
+               onClick={() => setSelectedAdvice(null)}
+               className="w-full py-4 bg-indigo-600 text-white font-black rounded-3xl shadow-xl active:scale-95 transition"
+             >
+               關閉報告 Close
+             </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderList = (title: string, items: any[], type: string, color: string) => (
     <div className="bg-white rounded-[35px] md:rounded-[50px] shadow-sm border border-slate-100 overflow-hidden pb-10 mb-8 px-4 md:px-0">
