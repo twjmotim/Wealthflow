@@ -17,17 +17,12 @@ export enum LiabilityType {
   OTHER = '其他 (Other)'
 }
 
-export enum Frequency {
-  MONTHLY = 'Monthly',
-  YEARLY = 'Yearly'
-}
-
 export interface AssetItem {
   id: string;
   name: string;
   type: AssetType;
   value: number;
-  returnRate?: number; // Annual expected return %
+  returnRate?: number;
   liquidity: 'High' | 'Medium' | 'Low';
 }
 
@@ -35,15 +30,15 @@ export interface LiabilityItem {
   id: string;
   name: string;
   type: LiabilityType;
-  amount: number; // Outstanding balance
-  interestRate: number; // Annual interest rate %
+  amount: number;
+  interestRate: number;
   monthlyPayment: number;
 }
 
 export interface CashFlowItem {
   id: string;
   name: string;
-  amount: number; // Normalized to monthly
+  amount: number;
   type: 'Income' | 'Expense';
 }
 
@@ -59,5 +54,18 @@ export interface Scenario {
   name: string;
   data: FinancialState;
   aiSummary: string;
+  createdAt: number;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  parts: { text: string }[];
+}
+
+export interface SavedAdvice {
+  id: string;
+  title: string;
+  content: string;
+  score: number;
   createdAt: number;
 }

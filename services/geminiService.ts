@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { FinancialState, AssetType, LiabilityType } from "../types";
 
@@ -25,12 +26,8 @@ Return a JSON object with the following structure:
 
 export const analyzeFinances = async (data: FinancialState): Promise<string> => {
   try {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey || apiKey.includes("undefined")) {
-        throw new Error("API Key 未設定。請在 Vercel 環境變數中設定 VITE_API_KEY。");
-    }
-
-    const ai = new GoogleGenAI({ apiKey: apiKey });
+    // Correct: Use new GoogleGenAI with named apiKey parameter from process.env.API_KEY
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const userPrompt = `
       Please analyze my current financial situation based on the following data:
@@ -54,7 +51,7 @@ export const analyzeFinances = async (data: FinancialState): Promise<string> => 
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-pro-preview',
       contents: userPrompt,
       config: {
         systemInstruction: getSystemInstruction(),
@@ -62,6 +59,7 @@ export const analyzeFinances = async (data: FinancialState): Promise<string> => 
       }
     });
 
+    // Correct: Access text as a property
     return response.text || "{}";
   } catch (error: any) {
     console.error("Gemini API Error:", error);
@@ -72,12 +70,8 @@ export const analyzeFinances = async (data: FinancialState): Promise<string> => 
 
 export const parseFinancialScreenshot = async (base64Image: string): Promise<string> => {
   try {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey || apiKey.includes("undefined")) {
-        throw new Error("API Key 未設定。請在 Vercel 環境變數中設定 VITE_API_KEY。");
-    }
-
-    const ai = new GoogleGenAI({ apiKey: apiKey });
+    // Correct: Use new GoogleGenAI with named apiKey parameter from process.env.API_KEY
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const prompt = `
       Analyze this image which is a screenshot of a financial account (Bank App, Securities App, or Credit Card Statement) from Taiwan.
@@ -106,7 +100,7 @@ export const parseFinancialScreenshot = async (base64Image: string): Promise<str
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: {
         parts: [
           { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
@@ -118,6 +112,7 @@ export const parseFinancialScreenshot = async (base64Image: string): Promise<str
       }
     });
 
+    // Correct: Access text as a property
     return response.text || '{"assets": [], "liabilities": []}';
   } catch (error: any) {
     console.error("Gemini Vision Error:", error);
@@ -127,12 +122,8 @@ export const parseFinancialScreenshot = async (base64Image: string): Promise<str
 
 export const generateScenarioSummary = async (baseline: FinancialState, scenario: FinancialState): Promise<string> => {
   try {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey || apiKey.includes("undefined")) {
-        return "無法生成摘要 (API Key Missing)";
-    }
-
-    const ai = new GoogleGenAI({ apiKey: apiKey });
+    // Correct: Use new GoogleGenAI with named apiKey parameter from process.env.API_KEY
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     // Calculate differences for prompt context
     const baselineAssets = baseline.assets.map(a => a.name);
@@ -156,10 +147,11 @@ export const generateScenarioSummary = async (baseline: FinancialState, scenario
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
     });
 
+    // Correct: Access text as a property
     return response.text || "情境模擬摘要生成失敗";
   } catch (error) {
     console.error("Gemini Scenario Error:", error);
